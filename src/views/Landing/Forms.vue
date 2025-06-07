@@ -11,6 +11,9 @@ export default {
       loading:true,
       create_loading:false,
       error:false,
+      form_error:false,
+      success:false,
+      message : null,
       form : null,
       items : {
         phone :null,
@@ -21,7 +24,7 @@ export default {
   },
   methods:{
     Get_Form(){
-      axios.get('http://localhost:8000/landing/forms/'+this.$route.params.token)
+      axios.get('https://core.hamidmasoudi.ir/landing/forms/'+this.$route.params.token)
       .then(response => {
         this.form = response.data.result
         if (this.form.fields.length){
@@ -35,18 +38,51 @@ export default {
         this.loading=false;
       })
       .catch(error => {
-        this.error = true
+        this.form_error = true
         this.loading=false;
       })
     },
-    Create_Form(){
-      this.create_loading = true
-      axios.post('http://localhost:8000/landing/forms/'+this.$route.params.token,this.items).then(response => {
+    Helpers_Methods_Convert_Number(input) {
+      const persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+      const arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+      if (typeof input === 'string') {
+        let output = input;
+        for (let i = 0; i < 10; i++) {
+          output = output.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
+        }
+        return output;
+      }
+      return input;
+    },
 
+
+    Create_Form(){
+      this.success=false
+      this.error = false
+      this.message = null
+      this.create_loading = true
+      if (!this.items.phone || !this.items.name){
+        this.error = true
+        this.create_loading = false
+        this.message = 'وارد کردن شماره موبایل و نام الزامی است'
+        return 0;
+      }
+      this.items.phone = this.Helpers_Methods_Convert_Number(this.items.phone)
+      axios.post('https://core.hamidmasoudi.ir/landing/forms/'+this.$route.params.token,this.items).then(response => {
+        this.success = true
+        this.create_loading = false
+        this.message = response.data.message
       }).catch(error => {
+        if (error.response.status === 422){
+          this.error = true
+          this.message = 'فرمت شماره موبایل صحیح نمیباشد !'
+        }else {
+          this.error = true
+          this.message = error.response.data.error
+        }
+        this.create_loading = false
 
       })
-
     }
   }
 }
@@ -55,16 +91,22 @@ export default {
 <template>
   <div class="row login-box">
     <template v-if="!loading">
-      <template v-if="!error">
+      <template v-if="!form_error">
         <div class="col-lg-6 form-section">
           <div class="form-inner p-4 pb-5" style="border-radius: 18px">
             <h4 class="mb-2 mt-4 text-dark">{{ form.name }}</h4>
             <div class="mt-3 text-secondary">
               {{ form.description }}
             </div>
+            <div class="alert alert-danger mt-3" v-if="error">
+              <strong>{{ message }}</strong>
+            </div>
+            <div class="alert alert-success mt-3" v-if="success">
+              <strong>{{ message }}</strong>
+            </div>
             <div class="mt-4">
               <div class="form-group position-relative clearfix">
-                <input v-model="items.phone" type="number" class="form-control" placeholder="شماره موبایل : 09XX XXX XXXX">
+                <input v-model="items.phone" type="text" class="form-control" placeholder="شماره موبایل : 09XX XXX XXXX">
               </div>
               <div class="form-group position-relative clearfix">
                 <input v-model="items.name" type="text" class="form-control" placeholder="نام و نام خانوادگی">
@@ -97,7 +139,6 @@ export default {
           </h5>
         </div>
       </template>
-
     </template>
   </div>
 </template>
